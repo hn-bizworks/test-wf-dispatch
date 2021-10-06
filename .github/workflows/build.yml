@@ -1,0 +1,65 @@
+name: Deploy PMVRPT Api
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+  
+jobs:
+ deploy-prs:
+    name: Deploy - PRS (Docker Swarm)
+    runs-on: [self-hosted, Linux]
+    concurrency: prs-pmvrpt-api    
+    environment: 
+      name: prs
+      url: https://zus2q2.myherbalife.com/en-us/bzw/pmvrpt/
+    
+    env:
+      DTR: msr.nonprod.myhrbl.com
+      CONTRAST_SUFFIX: " "
+      Cluster_network: bzw_q2_cluster_net
+      bzw_RptSqlConnection: bzw_RptSqlConnection_q2
+      bzw_externalAppSettings: bzw_externalAppSettings_q2_v5
+      ASPNETCORE_ENVIRONMENT: Quality
+      dld_snapshot_api: http://bzw_q2_export_api_svc 
+      SplunkSourceEnv: q2
+      CONTRAST_SERVER_ENVIRONMENT: qa
+      CONTRAST_SERVER_NAME: "QA Docker Cluster"
+      Replica: 1
+      MaxMemory: 1024M
+      MaxCPU: 0.5
+      Environment: nonprod
+      ManagerHostname: ZUSE02Q1LNUCP01
+      StackFile: /dcompose/docker-compose-tmpl.yml
+      ServiceName: bzw_q2_pmvrpt_api_svc
+      StackName: bzw_q2_pmvrpt_api
+      MonitoringPollingPeriod: 1
+      MonitoringTimeout: 300
+      ports: "12115:80"
+      
+    steps:
+    - name: Download artifact
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        github_token: ${{ secrets.SONAR_GITHUB_TOKEN }}
+        repo: 'bizworks-report-pmvrpt-api'
+        workflow: build.yml
+        workflow_conclusion: success
+        run_id: 1268445982
+        name: docker-compose
+        path: dcompose 
+      
+    #Docker deployment
+    - name: Replace Tokens
+      uses: cschleiden/replace-tokens@v1
+      with: 
+        tokenPrefix: '{'
+        tokenSuffix: '}'
+        files: '["dcompose/docker-compose-tmpl.yml"]'
+    - name: Deploy App
+      run: cd ~/ansible; ansible-playbook playbooks/deploy.yml -i ${{ env.Environment }} --limit ${{ env.ManagerHostname }} -e "SERVICE_NAME=${{ env.ServiceName }}" -e "SOURCE_COMPOSE_FILE=$GITHUB_WORKSPACE${{ env.StackFile }}" -e "STACK_NAME=${{ env.StackName }}" -e "SCRIPT_TIMEOUT=${{ env.MonitoringTimeout }}" -e "SCRIPT_POLLING_PERIOD=${{ env.MonitoringPollingPeriod }}"
+      
+    #Project Clenup
+    - uses: rtCamp/action-cleanup@master
+      if: ${{ always() }}
+    - run: echo "Completed cleanup workspace"
+      if: ${{ always() }}
