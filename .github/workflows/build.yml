@@ -38,7 +38,7 @@ jobs:
       
     steps:
     - name: Download artifact
-      uses: dawidd6/action-download-artifact@v2
+      uses: dawidd6/action-download-artifact@v6
       with:
         github_token: ${{ secrets.SONAR_GITHUB_TOKEN }}
         repo: 'bizworks-report-pmvrpt-api'
